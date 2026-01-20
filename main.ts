@@ -169,6 +169,12 @@ export default class BasesKanbanViewPlugin extends Plugin {
         default: "",
         type: "dropdown",
         options: this.getTemplateOptions()
+      },
+      {
+        displayName: "Default new subtask title",
+        key: "defaultSubtaskTitle",
+        default: "",
+        type: "text"
       }
     ];
   }
@@ -485,11 +491,15 @@ class KanbanView extends BasesView {
           }
         }
 
+        // Get default subtask title
+        const defaultSubtaskTitle = String(this.config.get("defaultSubtaskTitle") || "");
+
         new SubtaskModal(
           this.app,
           item.file.basename,
           item.file.path,
           subtaskTemplate,
+          defaultSubtaskTitle,
           this.plugin
         ).open();
       });
@@ -737,18 +747,22 @@ class SubtaskModal extends Modal {
   private subtaskTitle: string = "";
   private selectedTemplate: TFile | null = null;
   private defaultTemplatePath: string;
+  private defaultTitle: string;
 
   constructor(
     app: App,
     parentBasename: string,
     parentPath: string,
     defaultTemplate: string,
+    defaultTitle: string,
     plugin: BasesKanbanViewPlugin
   ) {
     super(app);
     this.parentBasename = parentBasename;
     this.parentPath = parentPath;
     this.defaultTemplatePath = defaultTemplate;
+    this.defaultTitle = defaultTitle;
+    this.subtaskTitle = defaultTitle;
     this.plugin = plugin;
   }
 
@@ -775,6 +789,7 @@ class SubtaskModal extends Modal {
       .setDesc("Name for the new subtask")
       .addText((text) => {
         text.setPlaceholder("Enter subtask title...");
+        text.setValue(this.defaultTitle);
         text.onChange((value) => {
           this.subtaskTitle = value;
         });
@@ -845,7 +860,7 @@ class SubtaskModal extends Modal {
             .trim();
           const templateBody = templateContent.slice(endOfFrontmatter + 3);
 
-          // Check if template already has parent property
+          // Check if template already has parent property (with or without value)
           const parentRegex = /^parent:.*$/m;
 
           if (parentRegex.test(templateFrontmatter)) {
@@ -859,7 +874,7 @@ class SubtaskModal extends Modal {
             templateFrontmatter = parentPropertyYaml + "\n" + templateFrontmatter;
           }
 
-          content = `---\n${templateFrontmatter}\n---\n${templateBody}`;
+          content = `---\n${templateFrontmatter}\n---${templateBody}`;
         } else {
           // Malformed frontmatter, just prepend
           content = `---\n${parentPropertyYaml}\n---\n\n${templateContent}`;

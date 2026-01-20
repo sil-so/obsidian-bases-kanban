@@ -110,6 +110,12 @@ var BasesKanbanViewPlugin = class extends import_obsidian.Plugin {
         default: "",
         type: "dropdown",
         options: this.getTemplateOptions()
+      },
+      {
+        displayName: "Default new subtask title",
+        key: "defaultSubtaskTitle",
+        default: "",
+        type: "text"
       }
     ];
   }
@@ -307,11 +313,13 @@ var KanbanView = class extends import_obsidian2.BasesView {
             subtaskTemplate = options[indexValue];
           }
         }
+        const defaultSubtaskTitle = String(this.config.get("defaultSubtaskTitle") || "");
         new SubtaskModal(
           this.app,
           item.file.basename,
           item.file.path,
           subtaskTemplate,
+          defaultSubtaskTitle,
           this.plugin
         ).open();
       });
@@ -478,13 +486,15 @@ ${columnPropertyYaml}
   }
 };
 var SubtaskModal = class extends import_obsidian.Modal {
-  constructor(app, parentBasename, parentPath, defaultTemplate, plugin) {
+  constructor(app, parentBasename, parentPath, defaultTemplate, defaultTitle, plugin) {
     super(app);
     this.subtaskTitle = "";
     this.selectedTemplate = null;
     this.parentBasename = parentBasename;
     this.parentPath = parentPath;
     this.defaultTemplatePath = defaultTemplate;
+    this.defaultTitle = defaultTitle;
+    this.subtaskTitle = defaultTitle;
     this.plugin = plugin;
   }
   onOpen() {
@@ -502,6 +512,7 @@ var SubtaskModal = class extends import_obsidian.Modal {
     }
     new import_obsidian.Setting(contentEl).setName("Subtask title").setDesc("Name for the new subtask").addText((text) => {
       text.setPlaceholder("Enter subtask title...");
+      text.setValue(this.defaultTitle);
       text.onChange((value) => {
         this.subtaskTitle = value;
       });
@@ -560,8 +571,7 @@ var SubtaskModal = class extends import_obsidian.Modal {
           }
           content = `---
 ${templateFrontmatter}
----
-${templateBody}`;
+---${templateBody}`;
         } else {
           content = `---
 ${parentPropertyYaml}
