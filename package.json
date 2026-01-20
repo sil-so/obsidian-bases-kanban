@@ -1,0 +1,15 @@
+{
+  "name": "bases-kanban-view",
+  "version": "1.0.0",
+  "main": "main.js",
+  "scripts": {
+    "build": "esbuild main.ts --bundle --outfile=main.js --external:obsidian --format=cjs --target=es2018",
+    "dev": "esbuild main.ts --bundle --outfile=main.js --external:obsidian --format=cjs --target=es2018 --watch"
+  },
+  "devDependencies": {
+    "@types/node": "^20.0.0",
+    "esbuild": "^0.27.2",
+    "obsidian": "^1.8.0",
+    "typescript": "^5.0.0"
+  }
+}

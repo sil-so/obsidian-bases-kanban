@@ -1,0 +1,194 @@
+/* Bases Kanban View - Matches native Cards view styling */
+
+/* Main kanban container - horizontal scroll layout */
+.bases-kanban-container {
+  display: flex;
+  gap: var(--size-4-4);
+  padding-top: var(--size-4-2);
+  padding-bottom: var(--size-4-2);
+  overflow-x: auto;
+  height: 100%;
+  align-items: flex-start;
+}
+
+/* Column styling - minimal like Cards view */
+.bases-kanban-column {
+  flex: 0 0 auto;
+  width: var(--kanban-card-width, 250px);
+  min-width: 180px;
+  max-height: 100%;
+  display: flex;
+  flex-direction: column;
+}
+
+/* Column header - text only like Cards view group headers */
+.bases-kanban-column-header {
+  display: flex;
+  align-items: center;
+  gap: var(--size-4-2);
+  padding: var(--size-4-1) 0;
+  margin-bottom: var(--size-4-2);
+}
+
+.bases-kanban-column-title {
+  font-size: var(--font-ui-small);
+  color: var(--text-muted);
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Cards container */
+.bases-kanban-column-cards {
+  flex: 1;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: var(--size-4-2);
+}
+
+/* Individual card - matches Cards view styling */
+.bases-kanban-card {
+  background-color: var(--bases-cards-background);
+  border-radius: var(--radius-s);
+  padding: var(--size-4-2) var(--size-4-3);
+  cursor: pointer;
+}
+
+/* Card title */
+.bases-kanban-card-title {
+  font-weight: var(--font-medium);
+  color: var(--text-normal);
+  margin-bottom: var(--size-2-1);
+  line-height: 1.4;
+}
+
+/* Card properties */
+.bases-kanban-card-properties {
+  display: flex;
+  flex-direction: column;
+  gap: var(--size-2-1);
+}
+
+.bases-kanban-card-property {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-top: 8px;
+}
+
+/* Property label - customize as needed */
+.kanban-property-label {
+  color: var(--bases-cards-label-color);
+  font-weight: var(--font-semi-medium);
+  padding-block-end: 2px;
+  letter-spacing: 0.00625em;
+  font-size: var(--font-ui-smaller);
+  padding: 0;
+}
+
+/* Property value - customize as needed */
+.kanban-property-value {
+  display: block;
+  line-height: 1;
+  align-items: center;
+  position: relative;
+  --input-border-width: 0;
+  padding: 0;
+  font-size: var(--bases-table-font-size);
+}
+
+.kanban-property-label,
+.kanban-property-value {
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+/* Quick add button - matches native clickable-icon styling */
+.bases-kanban-add-btn {
+  background: transparent;
+  border: none;
+  color: var(--text-faint);
+  cursor: pointer;
+  padding: var(--size-4-1);
+  border-radius: var(--radius-s);
+  flex-shrink: 0;
+  opacity: 0.6;
+  transition:
+    opacity 0.15s ease,
+    background-color 0.15s ease;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  --icon-size: var(--icon-s);
+}
+
+.bases-kanban-add-btn:hover {
+  opacity: 1;
+  color: var(--text-muted);
+  background-color: var(--background-modifier-hover);
+}
+
+/* Empty column state */
+.bases-kanban-column-empty {
+  text-align: center;
+  color: var(--text-faint);
+  padding: var(--size-4-4);
+  font-style: italic;
+  font-size: var(--font-ui-smaller);
+}
+
+/* No data state */
+.bases-kanban-no-data {
+  color: var(--text-muted);
+  padding: var(--size-4-4);
+  text-align: center;
+}
+
+/* Quick add modal */
+.bases-kanban-quick-add-modal h3 {
+  margin-top: 0;
+  margin-bottom: var(--size-4-4);
+  color: var(--text-normal);
+}
+
+.bases-kanban-quick-add-modal .setting-item {
+  border-top: none;
+  padding-top: var(--size-4-2);
+}
+
+.bases-kanban-quick-add-modal .setting-item:first-of-type {
+  padding-top: 0;
+}
+
+/* Scrollbar styling for columns */
+.bases-kanban-column-cards::-webkit-scrollbar {
+  width: 4px;
+}
+
+.bases-kanban-column-cards::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.bases-kanban-column-cards::-webkit-scrollbar-thumb {
+  background-color: var(--background-modifier-border);
+  border-radius: 2px;
+}
+
+/* Responsive adjustments */
+@media (max-width: 600px) {
+  .bases-kanban-container {
+    padding: var(--size-4-2);
+    gap: var(--size-4-3);
+  }
+
+  .bases-kanban-column {
+    min-width: 150px;
+  }
+
+  .bases-kanban-card {
+    padding: var(--size-4-1) var(--size-4-2);
+  }
+}
