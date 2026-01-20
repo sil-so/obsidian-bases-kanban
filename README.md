@@ -22,7 +22,7 @@ A custom Kanban board view for Obsidian, designed to work with **Obsidian Bases*
 
 ### Manual Installation
 
-1. Go to the [Releases](https://github.com/sil/bases-kanban-view/releases) page of this repository.
+1. Go to the [Releases](https://github.com/sil-so/bases-kanban-view/releases) page of this repository.
 2. Download the `main.js`, `manifest.json`, and `styles.css` files from the latest release.
 3. Create a folder named `bases-kanban-view` in your vault's `.obsidian/plugins/` directory.
 4. Place the downloaded files into that folder.
