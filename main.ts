@@ -156,6 +156,19 @@ export default class BasesKanbanViewPlugin extends Plugin {
         key: "quickAdd",
         default: true,
         type: "toggle"
+      },
+      {
+        displayName: "Show subtask button on cards",
+        key: "showSubtaskButton",
+        default: true,
+        type: "toggle"
+      },
+      {
+        displayName: "Subtask template",
+        key: "subtaskTemplate",
+        default: "",
+        type: "dropdown",
+        options: this.getTemplateOptions()
       }
     ];
   }
@@ -163,7 +176,7 @@ export default class BasesKanbanViewPlugin extends Plugin {
   public getTemplateOptions(): string[] {
     const options: string[] = [""];
     const templateNames: string[] = [];
-    
+
     const templateFolder = this.app.vault.getAbstractFileByPath("templates");
     if (templateFolder instanceof TFolder) {
       for (const child of templateFolder.children) {
@@ -172,11 +185,11 @@ export default class BasesKanbanViewPlugin extends Plugin {
         }
       }
     }
-    
+
     // Sort alphabetically for consistent ordering
     templateNames.sort();
     options.push(...templateNames);
-    
+
     return options;
   }
 }
@@ -209,6 +222,7 @@ class KanbanView extends BasesView {
     const cardWidth = Number(this.config.get("cardWidth")) || 250;
     const showEmptyColumns = this.config.get("showEmptyColumns") !== false;
     const showQuickAdd = this.config.get("quickAdd") !== false;
+    const showSubtaskButton = this.config.get("showSubtaskButton") !== false;
     const stripPrefix = String(this.config.get("stripPrefix") || "");
     const stripSuffix = String(this.config.get("stripSuffix") || "");
     const order = this.config.getOrder();
@@ -302,6 +316,7 @@ class KanbanView extends BasesView {
         order,
         columnProperty,
         showQuickAdd,
+        showSubtaskButton,
         stripPrefix,
         stripSuffix
       );
@@ -314,6 +329,7 @@ class KanbanView extends BasesView {
     order: string[],
     columnProperty: string,
     showQuickAdd: boolean,
+    showSubtaskButton: boolean,
     stripPrefix: string,
     stripSuffix: string
   ): void {
@@ -333,25 +349,35 @@ class KanbanView extends BasesView {
       addBtn.addEventListener("click", () => {
         const defaultTitle = String(this.config.get("defaultNoteTitle") || "");
         const defaultTemplateValue = this.config.get("defaultTemplate");
-        
-        console.log("Raw defaultTemplateValue:", defaultTemplateValue, "type:", typeof defaultTemplateValue);
-        
+
+        console.log(
+          "Raw defaultTemplateValue:",
+          defaultTemplateValue,
+          "type:",
+          typeof defaultTemplateValue
+        );
+
         // Bases stores the index (possibly as string), so we need to look up the template name
         let defaultTemplate = "";
-        const indexValue = typeof defaultTemplateValue === "string" 
-          ? parseInt(defaultTemplateValue, 10) 
-          : defaultTemplateValue;
-          
-        if (typeof indexValue === "number" && !isNaN(indexValue) && indexValue > 0) {
+        const indexValue =
+          typeof defaultTemplateValue === "string"
+            ? parseInt(defaultTemplateValue, 10)
+            : defaultTemplateValue;
+
+        if (
+          typeof indexValue === "number" &&
+          !isNaN(indexValue) &&
+          indexValue > 0
+        ) {
           const options = this.plugin.getTemplateOptions();
           console.log("Options:", options, "index:", indexValue);
           if (indexValue < options.length) {
             defaultTemplate = options[indexValue];
           }
         }
-        
+
         console.log("Resolved template name:", defaultTemplate);
-        
+
         new QuickAddModal(
           this.app,
           columnProperty,
@@ -381,6 +407,7 @@ class KanbanView extends BasesView {
         item,
         order,
         columnProperty,
+        showSubtaskButton,
         stripPrefix,
         stripSuffix
       );
@@ -392,6 +419,7 @@ class KanbanView extends BasesView {
     item: Value,
     order: string[],
     columnProperty: string,
+    showSubtaskButton: boolean,
     stripPrefix: string,
     stripSuffix: string
   ): void {
@@ -423,9 +451,49 @@ class KanbanView extends BasesView {
       displayTitle = displayTitle.slice(0, -stripSuffix.length).trim();
     }
 
-    // Card title
-    const titleEl = cardEl.createDiv("bases-kanban-card-title");
+    // Card header with title and subtask button
+    const headerEl = cardEl.createDiv("bases-kanban-card-header");
+    const titleEl = headerEl.createDiv("bases-kanban-card-title");
     titleEl.createSpan({ text: displayTitle });
+
+    // Add subtask button
+    if (showSubtaskButton) {
+      const subtaskBtn = headerEl.createEl("button", {
+        cls: "bases-kanban-subtask-btn clickable-icon",
+        attr: { "aria-label": "Add subtask" }
+      });
+      setIcon(subtaskBtn, "plus");
+      subtaskBtn.addEventListener("click", (e) => {
+        e.stopPropagation(); // Don't open the note
+
+        // Resolve subtask template
+        const subtaskTemplateValue = this.config.get("subtaskTemplate");
+        let subtaskTemplate = "";
+        const indexValue =
+          typeof subtaskTemplateValue === "string"
+            ? parseInt(subtaskTemplateValue, 10)
+            : subtaskTemplateValue;
+
+        if (
+          typeof indexValue === "number" &&
+          !isNaN(indexValue) &&
+          indexValue > 0
+        ) {
+          const options = this.plugin.getTemplateOptions();
+          if (indexValue < options.length) {
+            subtaskTemplate = options[indexValue];
+          }
+        }
+
+        new SubtaskModal(
+          this.app,
+          item.file.basename,
+          item.file.path,
+          subtaskTemplate,
+          this.plugin
+        ).open();
+      });
+    }
 
     // Handle hover preview on card
     cardEl.addEventListener("mouseover", (e) => {
@@ -536,7 +604,10 @@ class QuickAddModal extends Modal {
     console.log("defaultTemplatePath:", this.defaultTemplatePath);
     if (this.defaultTemplatePath) {
       const templates = this.getTemplates();
-      console.log("Available templates:", templates.map(t => t.basename));
+      console.log(
+        "Available templates:",
+        templates.map((t) => t.basename)
+      );
       const matchingTemplate = templates.find(
         (t) => t.basename === this.defaultTemplatePath
       );
@@ -655,6 +726,159 @@ class QuickAddModal extends Modal {
       this.close();
     } catch (e) {
       console.error("Failed to create note:", e);
+    }
+  }
+}
+
+class SubtaskModal extends Modal {
+  private parentBasename: string;
+  private parentPath: string;
+  private plugin: BasesKanbanViewPlugin;
+  private subtaskTitle: string = "";
+  private selectedTemplate: TFile | null = null;
+  private defaultTemplatePath: string;
+
+  constructor(
+    app: App,
+    parentBasename: string,
+    parentPath: string,
+    defaultTemplate: string,
+    plugin: BasesKanbanViewPlugin
+  ) {
+    super(app);
+    this.parentBasename = parentBasename;
+    this.parentPath = parentPath;
+    this.defaultTemplatePath = defaultTemplate;
+    this.plugin = plugin;
+  }
+
+  onOpen() {
+    const { contentEl } = this;
+    contentEl.addClass("bases-kanban-subtask-modal");
+
+    contentEl.createEl("h3", { text: `Add subtask to "${this.parentBasename}"` });
+
+    // Set template from config (if configured)
+    if (this.defaultTemplatePath) {
+      const templates = this.getTemplates();
+      const matchingTemplate = templates.find(
+        (t) => t.basename === this.defaultTemplatePath
+      );
+      if (matchingTemplate) {
+        this.selectedTemplate = matchingTemplate;
+      }
+    }
+
+    // Subtask title input
+    new Setting(contentEl)
+      .setName("Subtask title")
+      .setDesc("Name for the new subtask")
+      .addText((text) => {
+        text.setPlaceholder("Enter subtask title...");
+        text.onChange((value) => {
+          this.subtaskTitle = value;
+        });
+        // Focus the input
+        setTimeout(() => text.inputEl.focus(), 50);
+        
+        // Submit on Enter
+        text.inputEl.addEventListener("keydown", (e) => {
+          if (e.key === "Enter") {
+            e.preventDefault();
+            this.createSubtask();
+          }
+        });
+      });
+
+    // Create button
+    new Setting(contentEl).addButton((btn) => {
+      btn
+        .setButtonText("Create subtask")
+        .setCta()
+        .onClick(() => this.createSubtask());
+    });
+  }
+
+  onClose() {
+    const { contentEl } = this;
+    contentEl.empty();
+  }
+
+  private getTemplates(): TFile[] {
+    const templates: TFile[] = [];
+    const templateFolder = this.app.vault.getAbstractFileByPath("templates");
+
+    if (templateFolder instanceof TFolder) {
+      for (const child of templateFolder.children) {
+        if (child instanceof TFile && child.extension === "md") {
+          templates.push(child);
+        }
+      }
+    }
+
+    templates.sort((a, b) => a.basename.localeCompare(b.basename));
+    return templates;
+  }
+
+  private async createSubtask() {
+    if (!this.subtaskTitle.trim()) {
+      return;
+    }
+
+    const fileName = `${this.subtaskTitle.trim()}.md`;
+    
+    // Build frontmatter with parent link
+    const parentLink = `"[[${this.parentBasename}]]"`;
+    const parentPropertyYaml = `parent: ${parentLink}`;
+
+    let content: string;
+
+    if (this.selectedTemplate) {
+      const templateContent = await this.app.vault.read(this.selectedTemplate);
+
+      // If template has frontmatter, modify it
+      if (templateContent.startsWith("---")) {
+        const endOfFrontmatter = templateContent.indexOf("---", 3);
+        if (endOfFrontmatter !== -1) {
+          let templateFrontmatter = templateContent
+            .slice(4, endOfFrontmatter)
+            .trim();
+          const templateBody = templateContent.slice(endOfFrontmatter + 3);
+
+          // Check if template already has parent property
+          const parentRegex = /^parent:.*$/m;
+
+          if (parentRegex.test(templateFrontmatter)) {
+            // Replace existing parent property with new value
+            templateFrontmatter = templateFrontmatter.replace(
+              parentRegex,
+              parentPropertyYaml
+            );
+          } else {
+            // Add parent property at the beginning
+            templateFrontmatter = parentPropertyYaml + "\n" + templateFrontmatter;
+          }
+
+          content = `---\n${templateFrontmatter}\n---\n${templateBody}`;
+        } else {
+          // Malformed frontmatter, just prepend
+          content = `---\n${parentPropertyYaml}\n---\n\n${templateContent}`;
+        }
+      } else {
+        // No frontmatter in template
+        content = `---\n${parentPropertyYaml}\n---\n\n${templateContent}`;
+      }
+    } else {
+      // No template selected - create minimal note with parent
+      content = `---\n${parentPropertyYaml}\nstatus:\n  - backlog\n---\n\n`;
+    }
+
+    try {
+      const file = await this.app.vault.create(fileName, content);
+      this.app.workspace.getLeaf(false).openFile(file);
+      this.close();
+    } catch (e) {
+      console.error("Failed to create subtask:", e);
     }
   }
 }

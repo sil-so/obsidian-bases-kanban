@@ -56,12 +56,51 @@
   cursor: pointer;
 }
 
+/* Card header - contains title and subtask button */
+.bases-kanban-card-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--size-4-1);
+  margin-bottom: var(--size-2-1);
+}
+
 /* Card title */
 .bases-kanban-card-title {
   font-weight: var(--font-medium);
   color: var(--text-normal);
-  margin-bottom: var(--size-2-1);
   line-height: 1.4;
+  flex: 1;
+  min-width: 0;
+}
+
+/* Subtask button on card */
+.bases-kanban-subtask-btn {
+  background: transparent;
+  border: none;
+  color: var(--text-faint);
+  cursor: pointer;
+  padding: 2px;
+  border-radius: var(--radius-s);
+  flex-shrink: 0;
+  opacity: 0;
+  transition:
+    opacity 0.15s ease,
+    background-color 0.15s ease;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  --icon-size: var(--icon-xs);
+}
+
+.bases-kanban-card:hover .bases-kanban-subtask-btn {
+  opacity: 0.6;
+}
+
+.bases-kanban-subtask-btn:hover {
+  opacity: 1;
+  color: var(--text-muted);
+  background-color: var(--background-modifier-hover);
 }
 
 /* Card properties */
@@ -148,18 +187,21 @@
 }
 
 /* Quick add modal */
-.bases-kanban-quick-add-modal h3 {
+.bases-kanban-quick-add-modal h3,
+.bases-kanban-subtask-modal h3 {
   margin-top: 0;
   margin-bottom: var(--size-4-4);
   color: var(--text-normal);
 }
 
-.bases-kanban-quick-add-modal .setting-item {
+.bases-kanban-quick-add-modal .setting-item,
+.bases-kanban-subtask-modal .setting-item {
   border-top: none;
   padding-top: var(--size-4-2);
 }
 
-.bases-kanban-quick-add-modal .setting-item:first-of-type {
+.bases-kanban-quick-add-modal .setting-item:first-of-type,
+.bases-kanban-subtask-modal .setting-item:first-of-type {
   padding-top: 0;
 }
 

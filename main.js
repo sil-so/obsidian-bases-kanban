@@ -97,6 +97,19 @@ var BasesKanbanViewPlugin = class extends import_obsidian.Plugin {
         key: "quickAdd",
         default: true,
         type: "toggle"
+      },
+      {
+        displayName: "Show subtask button on cards",
+        key: "showSubtaskButton",
+        default: true,
+        type: "toggle"
+      },
+      {
+        displayName: "Subtask template",
+        key: "subtaskTemplate",
+        default: "",
+        type: "dropdown",
+        options: this.getTemplateOptions()
       }
     ];
   }
@@ -132,6 +145,7 @@ var KanbanView = class extends import_obsidian2.BasesView {
     const cardWidth = Number(this.config.get("cardWidth")) || 250;
     const showEmptyColumns = this.config.get("showEmptyColumns") !== false;
     const showQuickAdd = this.config.get("quickAdd") !== false;
+    const showSubtaskButton = this.config.get("showSubtaskButton") !== false;
     const stripPrefix = String(this.config.get("stripPrefix") || "");
     const stripSuffix = String(this.config.get("stripSuffix") || "");
     const order = this.config.getOrder();
@@ -190,12 +204,13 @@ var KanbanView = class extends import_obsidian2.BasesView {
         order,
         columnProperty,
         showQuickAdd,
+        showSubtaskButton,
         stripPrefix,
         stripSuffix
       );
     }
   }
-  renderColumn(columnName, items, order, columnProperty, showQuickAdd, stripPrefix, stripSuffix) {
+  renderColumn(columnName, items, order, columnProperty, showQuickAdd, showSubtaskButton, stripPrefix, stripSuffix) {
     const columnEl = this.containerEl.createDiv("bases-kanban-column");
     columnEl.dataset.column = columnName;
     const headerEl = columnEl.createDiv("bases-kanban-column-header");
@@ -209,7 +224,12 @@ var KanbanView = class extends import_obsidian2.BasesView {
       addBtn.addEventListener("click", () => {
         const defaultTitle = String(this.config.get("defaultNoteTitle") || "");
         const defaultTemplateValue = this.config.get("defaultTemplate");
-        console.log("Raw defaultTemplateValue:", defaultTemplateValue, "type:", typeof defaultTemplateValue);
+        console.log(
+          "Raw defaultTemplateValue:",
+          defaultTemplateValue,
+          "type:",
+          typeof defaultTemplateValue
+        );
         let defaultTemplate = "";
         const indexValue = typeof defaultTemplateValue === "string" ? parseInt(defaultTemplateValue, 10) : defaultTemplateValue;
         if (typeof indexValue === "number" && !isNaN(indexValue) && indexValue > 0) {
@@ -244,12 +264,13 @@ var KanbanView = class extends import_obsidian2.BasesView {
         item,
         order,
         columnProperty,
+        showSubtaskButton,
         stripPrefix,
         stripSuffix
       );
     }
   }
-  renderCard(container, item, order, columnProperty, stripPrefix, stripSuffix) {
+  renderCard(container, item, order, columnProperty, showSubtaskButton, stripPrefix, stripSuffix) {
     const cardEl = container.createDiv("bases-kanban-card");
     cardEl.dataset.path = item.file.path;
     cardEl.addEventListener("click", (e) => {
@@ -266,8 +287,35 @@ var KanbanView = class extends import_obsidian2.BasesView {
     if (stripSuffix && displayTitle.toLowerCase().endsWith(stripSuffix.toLowerCase())) {
       displayTitle = displayTitle.slice(0, -stripSuffix.length).trim();
     }
-    const titleEl = cardEl.createDiv("bases-kanban-card-title");
+    const headerEl = cardEl.createDiv("bases-kanban-card-header");
+    const titleEl = headerEl.createDiv("bases-kanban-card-title");
     titleEl.createSpan({ text: displayTitle });
+    if (showSubtaskButton) {
+      const subtaskBtn = headerEl.createEl("button", {
+        cls: "bases-kanban-subtask-btn clickable-icon",
+        attr: { "aria-label": "Add subtask" }
+      });
+      (0, import_obsidian.setIcon)(subtaskBtn, "plus");
+      subtaskBtn.addEventListener("click", (e) => {
+        e.stopPropagation();
+        const subtaskTemplateValue = this.config.get("subtaskTemplate");
+        let subtaskTemplate = "";
+        const indexValue = typeof subtaskTemplateValue === "string" ? parseInt(subtaskTemplateValue, 10) : subtaskTemplateValue;
+        if (typeof indexValue === "number" && !isNaN(indexValue) && indexValue > 0) {
+          const options = this.plugin.getTemplateOptions();
+          if (indexValue < options.length) {
+            subtaskTemplate = options[indexValue];
+          }
+        }
+        new SubtaskModal(
+          this.app,
+          item.file.basename,
+          item.file.path,
+          subtaskTemplate,
+          this.plugin
+        ).open();
+      });
+    }
     cardEl.addEventListener("mouseover", (e) => {
       this.app.workspace.trigger("hover-link", {
         event: e,
@@ -326,7 +374,10 @@ var QuickAddModal = class extends import_obsidian.Modal {
     console.log("defaultTemplatePath:", this.defaultTemplatePath);
     if (this.defaultTemplatePath) {
       const templates = this.getTemplates();
-      console.log("Available templates:", templates.map((t) => t.basename));
+      console.log(
+        "Available templates:",
+        templates.map((t) => t.basename)
+      );
       const matchingTemplate = templates.find(
         (t) => t.basename === this.defaultTemplatePath
       );
@@ -423,6 +474,123 @@ ${columnPropertyYaml}
       this.close();
     } catch (e) {
       console.error("Failed to create note:", e);
+    }
+  }
+};
+var SubtaskModal = class extends import_obsidian.Modal {
+  constructor(app, parentBasename, parentPath, defaultTemplate, plugin) {
+    super(app);
+    this.subtaskTitle = "";
+    this.selectedTemplate = null;
+    this.parentBasename = parentBasename;
+    this.parentPath = parentPath;
+    this.defaultTemplatePath = defaultTemplate;
+    this.plugin = plugin;
+  }
+  onOpen() {
+    const { contentEl } = this;
+    contentEl.addClass("bases-kanban-subtask-modal");
+    contentEl.createEl("h3", { text: `Add subtask to "${this.parentBasename}"` });
+    if (this.defaultTemplatePath) {
+      const templates = this.getTemplates();
+      const matchingTemplate = templates.find(
+        (t) => t.basename === this.defaultTemplatePath
+      );
+      if (matchingTemplate) {
+        this.selectedTemplate = matchingTemplate;
+      }
+    }
+    new import_obsidian.Setting(contentEl).setName("Subtask title").setDesc("Name for the new subtask").addText((text) => {
+      text.setPlaceholder("Enter subtask title...");
+      text.onChange((value) => {
+        this.subtaskTitle = value;
+      });
+      setTimeout(() => text.inputEl.focus(), 50);
+      text.inputEl.addEventListener("keydown", (e) => {
+        if (e.key === "Enter") {
+          e.preventDefault();
+          this.createSubtask();
+        }
+      });
+    });
+    new import_obsidian.Setting(contentEl).addButton((btn) => {
+      btn.setButtonText("Create subtask").setCta().onClick(() => this.createSubtask());
+    });
+  }
+  onClose() {
+    const { contentEl } = this;
+    contentEl.empty();
+  }
+  getTemplates() {
+    const templates = [];
+    const templateFolder = this.app.vault.getAbstractFileByPath("templates");
+    if (templateFolder instanceof import_obsidian.TFolder) {
+      for (const child of templateFolder.children) {
+        if (child instanceof import_obsidian.TFile && child.extension === "md") {
+          templates.push(child);
+        }
+      }
+    }
+    templates.sort((a, b) => a.basename.localeCompare(b.basename));
+    return templates;
+  }
+  async createSubtask() {
+    if (!this.subtaskTitle.trim()) {
+      return;
+    }
+    const fileName = `${this.subtaskTitle.trim()}.md`;
+    const parentLink = `"[[${this.parentBasename}]]"`;
+    const parentPropertyYaml = `parent: ${parentLink}`;
+    let content;
+    if (this.selectedTemplate) {
+      const templateContent = await this.app.vault.read(this.selectedTemplate);
+      if (templateContent.startsWith("---")) {
+        const endOfFrontmatter = templateContent.indexOf("---", 3);
+        if (endOfFrontmatter !== -1) {
+          let templateFrontmatter = templateContent.slice(4, endOfFrontmatter).trim();
+          const templateBody = templateContent.slice(endOfFrontmatter + 3);
+          const parentRegex = /^parent:.*$/m;
+          if (parentRegex.test(templateFrontmatter)) {
+            templateFrontmatter = templateFrontmatter.replace(
+              parentRegex,
+              parentPropertyYaml
+            );
+          } else {
+            templateFrontmatter = parentPropertyYaml + "\n" + templateFrontmatter;
+          }
+          content = `---
+${templateFrontmatter}
+---
+${templateBody}`;
+        } else {
+          content = `---
+${parentPropertyYaml}
+---
+
+${templateContent}`;
+        }
+      } else {
+        content = `---
+${parentPropertyYaml}
+---
+
+${templateContent}`;
+      }
+    } else {
+      content = `---
+${parentPropertyYaml}
+status:
+  - backlog
+---
+
+`;
+    }
+    try {
+      const file = await this.app.vault.create(fileName, content);
+      this.app.workspace.getLeaf(false).openFile(file);
+      this.close();
+    } catch (e) {
+      console.error("Failed to create subtask:", e);
     }
   }
 };
