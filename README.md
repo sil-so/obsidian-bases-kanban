@@ -37,7 +37,7 @@ A custom Kanban board view for Obsidian, designed to work with **Obsidian Bases*
 
 ## Configuration
 
-This view offers several configuration options accessible via the "View Toolbar" (three dots icon) when the view is active.
+This view offers several configuration options.
 
 ### Columns
 
