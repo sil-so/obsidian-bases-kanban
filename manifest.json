@@ -4,6 +4,6 @@
   "version": "1.0.0",
   "minAppVersion": "1.8.0",
   "description": "Adds a Kanban board view type to Obsidian Bases for task and project management.",
-  "author": "sil",
+  "author": "Silso",
   "isDesktopOnly": false
 }

@@ -25,7 +25,6 @@ __export(main_exports, {
 });
 module.exports = __toCommonJS(main_exports);
 var import_obsidian = require("obsidian");
-var import_obsidian2 = require("obsidian");
 var KANBAN_VIEW_TYPE = "kanban";
 var BasesKanbanViewPlugin = class extends import_obsidian.Plugin {
   async onload() {
@@ -43,99 +42,148 @@ var BasesKanbanViewPlugin = class extends import_obsidian.Plugin {
   getViewOptions() {
     return [
       {
-        displayName: "Column property",
-        key: "columnProperty",
-        default: "status",
-        type: "text"
+        type: "group",
+        displayName: "Columns",
+        items: [
+          {
+            displayName: "Column property",
+            key: "columnProperty",
+            default: "status",
+            type: "text",
+            placeholder: "Property to group cards by"
+          },
+          {
+            displayName: "Columns (comma-separated)",
+            key: "columns",
+            default: "",
+            type: "text",
+            placeholder: "Leave empty for auto-detect"
+          },
+          {
+            displayName: "Show empty columns",
+            key: "showEmptyColumns",
+            default: true,
+            type: "toggle"
+          }
+        ]
       },
       {
-        displayName: "Columns (comma-separated, leave empty for auto)",
-        key: "columns",
-        default: "",
-        type: "text"
+        type: "group",
+        displayName: "Cards",
+        items: [
+          {
+            displayName: "Strip from title start",
+            key: "stripPrefix",
+            default: "",
+            type: "text"
+          },
+          {
+            displayName: "Strip from title end",
+            key: "stripSuffix",
+            default: "",
+            type: "text"
+          }
+        ]
       },
       {
-        displayName: "Strip from card title start",
-        key: "stripPrefix",
-        default: "",
-        type: "text"
+        type: "group",
+        displayName: "Templates",
+        items: [
+          {
+            displayName: "Default new note title",
+            key: "defaultNoteTitle",
+            default: "",
+            type: "text"
+          },
+          {
+            displayName: "Default new note template",
+            key: "defaultTemplate",
+            default: "",
+            type: "dropdown",
+            options: this.getTemplateOptionsRecord()
+          },
+          {
+            displayName: "Default subnote title",
+            key: "defaultSubtaskTitle",
+            default: "",
+            type: "text"
+          },
+          {
+            displayName: "Subnote template",
+            key: "subtaskTemplate",
+            default: "",
+            type: "dropdown",
+            options: this.getTemplateOptionsRecord()
+          }
+        ]
       },
       {
-        displayName: "Strip from card title end",
-        key: "stripSuffix",
-        default: "",
-        type: "text"
-      },
-      {
-        displayName: "Default new note title",
-        key: "defaultNoteTitle",
-        default: "",
-        type: "text"
-      },
-      {
-        displayName: "Default new note template",
-        key: "defaultTemplate",
-        default: "",
-        type: "dropdown",
-        options: this.getTemplateOptions()
-      },
-      {
-        displayName: "Card width (px)",
-        key: "cardWidth",
-        default: 250,
-        type: "slider",
-        sliderConfig: { min: 150, max: 400, step: 10 }
-      },
-      {
-        displayName: "Show empty columns",
-        key: "showEmptyColumns",
-        default: true,
-        type: "toggle"
-      },
-      {
-        displayName: "Quick add cards",
-        key: "quickAdd",
-        default: true,
-        type: "toggle"
-      },
-      {
-        displayName: "Show subtask button on cards",
-        key: "showSubtaskButton",
-        default: true,
-        type: "toggle"
-      },
-      {
-        displayName: "Subtask template",
-        key: "subtaskTemplate",
-        default: "",
-        type: "dropdown",
-        options: this.getTemplateOptions()
-      },
-      {
-        displayName: "Default new subtask title",
-        key: "defaultSubtaskTitle",
-        default: "",
-        type: "text"
+        type: "group",
+        displayName: "Behavior",
+        items: [
+          {
+            displayName: "Quick add cards",
+            key: "quickAdd",
+            default: true,
+            type: "toggle"
+          },
+          {
+            displayName: "Enable drag and drop",
+            key: "enableDragDrop",
+            default: true,
+            type: "toggle"
+          },
+          {
+            displayName: "Show subnote button",
+            key: "showSubtaskButton",
+            default: true,
+            type: "toggle"
+          },
+          {
+            displayName: "Link property name",
+            key: "linkPropertyName",
+            default: "",
+            type: "text",
+            placeholder: "Property to auto-set when creating notes. Empty = disabled."
+          }
+        ]
       }
     ];
   }
-  getTemplateOptions() {
-    const options = [""];
-    const templateNames = [];
+  getTemplateOptionsRecord() {
+    const options = { "": "(None)" };
     const templateFolder = this.app.vault.getAbstractFileByPath("templates");
     if (templateFolder instanceof import_obsidian.TFolder) {
+      const templateNames = [];
       for (const child of templateFolder.children) {
         if (child instanceof import_obsidian.TFile && child.extension === "md") {
           templateNames.push(child.basename);
         }
       }
+      templateNames.sort();
+      for (const name of templateNames) {
+        options[name] = name;
+      }
     }
-    templateNames.sort();
-    options.push(...templateNames);
+    return options;
+  }
+  getTemplateOptions() {
+    const options = [""];
+    const templateFolder = this.app.vault.getAbstractFileByPath("templates");
+    if (templateFolder instanceof import_obsidian.TFolder) {
+      const templateNames = [];
+      for (const child of templateFolder.children) {
+        if (child instanceof import_obsidian.TFile && child.extension === "md") {
+          templateNames.push(child.basename);
+        }
+      }
+      templateNames.sort();
+      options.push(...templateNames);
+    }
     return options;
   }
 };
-var KanbanView = class extends import_obsidian2.BasesView {
+var KanbanView = class extends import_obsidian.BasesView {
   constructor(controller, parentEl, plugin) {
     super(controller);
     this.type = KANBAN_VIEW_TYPE;
@@ -148,14 +196,16 @@ var KanbanView = class extends import_obsidian2.BasesView {
     const rawColumnProp = this.config.get("columnProperty");
     const columnProperty = rawColumnProp && rawColumnProp !== "undefined" ? String(rawColumnProp) : "status";
     const columnsConfig = String(this.config.get("columns") || "").trim();
-    const cardWidth = Number(this.config.get("cardWidth")) || 250;
     const showEmptyColumns = this.config.get("showEmptyColumns") !== false;
     const showQuickAdd = this.config.get("quickAdd") !== false;
     const showSubtaskButton = this.config.get("showSubtaskButton") !== false;
+    const enableDragDrop = this.config.get("enableDragDrop") !== false;
     const stripPrefix = String(this.config.get("stripPrefix") || "");
     const stripSuffix = String(this.config.get("stripSuffix") || "");
+    const linkPropertyName = String(this.config.get("linkPropertyName") || "");
     const order = this.config.getOrder();
-    this.containerEl.style.setProperty("--kanban-card-width", `${cardWidth}px`);
+    const embeddingFile = this.getEmbeddingFile();
+    const linkValue = embeddingFile ? `[[${embeddingFile.basename}]]` : "";
     const allItems = [];
     if (((_a = this.data) == null ? void 0 : _a.groupedData) && Array.isArray(this.data.groupedData)) {
       for (const group of this.data.groupedData) {
@@ -164,8 +214,8 @@ var KanbanView = class extends import_obsidian2.BasesView {
         }
       }
     }
-    if (allItems.length === 0 && ((_b = this.data) == null ? void 0 : _b.ungroupedData) && Array.isArray(this.data.ungroupedData)) {
-      allItems.push(...this.data.ungroupedData);
+    if (allItems.length === 0 && ((_b = this.data) == null ? void 0 : _b.data) && Array.isArray(this.data.data)) {
+      allItems.push(...this.data.data);
     }
     if (allItems.length === 0) {
       this.containerEl.createDiv({
@@ -205,19 +255,57 @@ var KanbanView = class extends import_obsidian2.BasesView {
         continue;
       }
       this.renderColumn(
+        this.containerEl,
         columnName,
         items,
         order,
         columnProperty,
         showQuickAdd,
         showSubtaskButton,
+        enableDragDrop,
         stripPrefix,
-        stripSuffix
+        stripSuffix,
+        linkPropertyName,
+        linkValue
       );
     }
   }
-  renderColumn(columnName, items, order, columnProperty, showQuickAdd, showSubtaskButton, stripPrefix, stripSuffix) {
-    const columnEl = this.containerEl.createDiv("bases-kanban-column");
+  /**
+   * Auto-detect the file that embeds this base view.
+   * When a .base file is embedded in a markdown note (e.g., ![[tasks.base]]),
+   * this method finds that parent note so we can use it as the parent property.
+   */
+  getEmbeddingFile() {
+    try {
+      const leaf = this.containerEl.closest(".workspace-leaf");
+      if (!leaf) return null;
+      const viewHeader = leaf.querySelector(".view-header-title");
+      if (viewHeader && viewHeader.textContent) {
+        const files = this.app.vault.getMarkdownFiles();
+        const matchingFile = files.find(
+          (f) => f.basename === viewHeader.textContent
+        );
+        if (matchingFile) return matchingFile;
+      }
+      const embedContainer = this.containerEl.closest(".markdown-embed");
+      if (embedContainer) {
+        const markdownView = embedContainer.closest(
+          ".markdown-reading-view, .markdown-source-view"
+        );
+        if (markdownView) {
+          const activeFile = this.app.workspace.getActiveFile();
+          if (activeFile && activeFile.extension === "md") {
+            return activeFile;
+          }
+        }
+      }
+      return null;
+    } catch (e) {
+      return null;
+    }
+  }
+  renderColumn(container, columnName, items, order, columnProperty, showQuickAdd, showSubtaskButton, enableDragDrop, stripPrefix, stripSuffix, linkPropertyName, linkValue) {
+    const columnEl = container.createDiv("bases-kanban-column");
     columnEl.dataset.column = columnName;
     const headerEl = columnEl.createDiv("bases-kanban-column-header");
     headerEl.createSpan({ cls: "bases-kanban-column-title", text: columnName });
@@ -230,33 +318,47 @@ var KanbanView = class extends import_obsidian2.BasesView {
       addBtn.addEventListener("click", () => {
         const defaultTitle = String(this.config.get("defaultNoteTitle") || "");
         const defaultTemplateValue = this.config.get("defaultTemplate");
-        console.log(
-          "Raw defaultTemplateValue:",
-          defaultTemplateValue,
-          "type:",
-          typeof defaultTemplateValue
-        );
-        let defaultTemplate = "";
-        const indexValue = typeof defaultTemplateValue === "string" ? parseInt(defaultTemplateValue, 10) : defaultTemplateValue;
-        if (typeof indexValue === "number" && !isNaN(indexValue) && indexValue > 0) {
-          const options = this.plugin.getTemplateOptions();
-          console.log("Options:", options, "index:", indexValue);
-          if (indexValue < options.length) {
-            defaultTemplate = options[indexValue];
-          }
-        }
-        console.log("Resolved template name:", defaultTemplate);
+        const defaultTemplate = typeof defaultTemplateValue === "string" ? defaultTemplateValue : "";
         new QuickAddModal(
           this.app,
           columnProperty,
           columnName,
           defaultTitle,
           defaultTemplate,
+          linkPropertyName,
+          linkValue,
           this.plugin
         ).open();
       });
     }
     const cardsEl = columnEl.createDiv("bases-kanban-column-cards");
+    if (enableDragDrop) {
+      cardsEl.addEventListener("dragover", (e) => {
+        e.preventDefault();
+        cardsEl.addClass("drag-over");
+      });
+      cardsEl.addEventListener("dragleave", (e) => {
+        if (!cardsEl.contains(e.relatedTarget)) {
+          cardsEl.removeClass("drag-over");
+        }
+      });
+      cardsEl.addEventListener("drop", async (e) => {
+        var _a;
+        e.preventDefault();
+        cardsEl.removeClass("drag-over");
+        const filePath = (_a = e.dataTransfer) == null ? void 0 : _a.getData("text/plain");
+        if (!filePath) return;
+        const file = this.app.vault.getAbstractFileByPath(filePath);
+        if (!(file instanceof import_obsidian.TFile)) return;
+        try {
+          await this.app.fileManager.processFrontMatter(file, (frontmatter) => {
+            frontmatter[columnProperty] = [columnName];
+          });
+        } catch (err) {
+          console.error("Failed to update card column:", err);
+        }
+      });
+    }
     if (items.length === 0) {
       cardsEl.createDiv({
         cls: "bases-kanban-column-empty",
@@ -271,14 +373,27 @@ var KanbanView = class extends import_obsidian2.BasesView {
         order,
         columnProperty,
         showSubtaskButton,
+        enableDragDrop,
         stripPrefix,
-        stripSuffix
+        stripSuffix,
+        linkPropertyName
       );
     }
   }
-  renderCard(container, item, order, columnProperty, showSubtaskButton, stripPrefix, stripSuffix) {
+  renderCard(container, item, order, columnProperty, showSubtaskButton, enableDragDrop, stripPrefix, stripSuffix, linkPropertyName) {
     const cardEl = container.createDiv("bases-kanban-card");
     cardEl.dataset.path = item.file.path;
+    if (enableDragDrop) {
+      cardEl.draggable = true;
+      cardEl.addEventListener("dragstart", (e) => {
+        var _a;
+        (_a = e.dataTransfer) == null ? void 0 : _a.setData("text/plain", item.file.path);
+        cardEl.addClass("is-dragging");
+      });
+      cardEl.addEventListener("dragend", () => {
+        cardEl.removeClass("is-dragging");
+      });
+    }
     cardEl.addEventListener("click", (e) => {
       if (e.target.closest("a")) return;
       const file = this.app.vault.getAbstractFileByPath(item.file.path);
@@ -299,27 +414,23 @@ var KanbanView = class extends import_obsidian2.BasesView {
     if (showSubtaskButton) {
       const subtaskBtn = headerEl.createEl("button", {
         cls: "bases-kanban-subtask-btn clickable-icon",
-        attr: { "aria-label": "Add subtask" }
+        attr: { "aria-label": "Add subnote" }
       });
       (0, import_obsidian.setIcon)(subtaskBtn, "plus");
       subtaskBtn.addEventListener("click", (e) => {
         e.stopPropagation();
         const subtaskTemplateValue = this.config.get("subtaskTemplate");
-        let subtaskTemplate = "";
-        const indexValue = typeof subtaskTemplateValue === "string" ? parseInt(subtaskTemplateValue, 10) : subtaskTemplateValue;
-        if (typeof indexValue === "number" && !isNaN(indexValue) && indexValue > 0) {
-          const options = this.plugin.getTemplateOptions();
-          if (indexValue < options.length) {
-            subtaskTemplate = options[indexValue];
-          }
-        }
-        const defaultSubtaskTitle = String(this.config.get("defaultSubtaskTitle") || "");
+        const subtaskTemplate = typeof subtaskTemplateValue === "string" ? subtaskTemplateValue : "";
+        const defaultSubtaskTitle = String(
+          this.config.get("defaultSubtaskTitle") || ""
+        );
         new SubtaskModal(
           this.app,
           item.file.basename,
           item.file.path,
           subtaskTemplate,
           defaultSubtaskTitle,
+          linkPropertyName,
           this.plugin
         ).open();
       });
@@ -364,7 +475,7 @@ var KanbanView = class extends import_obsidian2.BasesView {
   }
 };
 var QuickAddModal = class extends import_obsidian.Modal {
-  constructor(app, columnProperty, columnValue, defaultTitle, defaultTemplate, plugin) {
+  constructor(app, columnProperty, columnValue, defaultTitle, defaultTemplate, linkPropertyName, linkValue, plugin) {
     super(app);
     this.noteTitle = "";
     this.selectedTemplate = null;
@@ -373,28 +484,23 @@ var QuickAddModal = class extends import_obsidian.Modal {
     this.defaultTitle = defaultTitle;
     this.noteTitle = defaultTitle;
     this.defaultTemplatePath = defaultTemplate;
+    this.linkPropertyName = linkPropertyName;
+    this.linkValue = linkValue;
     this.plugin = plugin;
   }
   onOpen() {
     const { contentEl } = this;
     contentEl.addClass("bases-kanban-quick-add-modal");
     contentEl.createEl("h3", { text: "Add new card" });
-    console.log("defaultTemplatePath:", this.defaultTemplatePath);
     if (this.defaultTemplatePath) {
       const templates = this.getTemplates();
-      console.log(
-        "Available templates:",
-        templates.map((t) => t.basename)
-      );
       const matchingTemplate = templates.find(
         (t) => t.basename === this.defaultTemplatePath
       );
-      console.log("Matching template:", matchingTemplate);
       if (matchingTemplate) {
         this.selectedTemplate = matchingTemplate;
       }
     }
-    console.log("Selected template:", this.selectedTemplate);
     new import_obsidian.Setting(contentEl).setName("Title").setDesc("Name for the new note").addText((text) => {
       text.setPlaceholder("Enter note title...");
       text.setValue(this.defaultTitle);
@@ -429,8 +535,12 @@ var QuickAddModal = class extends import_obsidian.Modal {
       return;
     }
     const fileName = `${this.noteTitle.trim()}.md`;
-    const columnPropertyYaml = `${this.columnProperty}:
+    let frontmatterProps = `${this.columnProperty}:
   - ${this.columnValue}`;
+    if (this.linkPropertyName && this.linkValue) {
+      frontmatterProps += `
+${this.linkPropertyName}: "${this.linkValue}"`;
+    }
     let content;
     if (this.selectedTemplate) {
       const templateContent = await this.app.vault.read(this.selectedTemplate);
@@ -446,10 +556,25 @@ var QuickAddModal = class extends import_obsidian.Modal {
           if (propRegex.test(templateFrontmatter)) {
             templateFrontmatter = templateFrontmatter.replace(
               propRegex,
-              columnPropertyYaml
+              `${this.columnProperty}:
+  - ${this.columnValue}`
             );
           } else {
-            templateFrontmatter = columnPropertyYaml + "\n" + templateFrontmatter;
+            templateFrontmatter = `${this.columnProperty}:
+  - ${this.columnValue}
+` + templateFrontmatter;
+          }
+          if (this.linkPropertyName && this.linkValue) {
+            const linkPropRegex = new RegExp(`^${this.linkPropertyName}:.*$`, "m");
+            if (linkPropRegex.test(templateFrontmatter)) {
+              templateFrontmatter = templateFrontmatter.replace(
+                linkPropRegex,
+                `${this.linkPropertyName}: "${this.linkValue}"`
+              );
+            } else {
+              templateFrontmatter += `
+${this.linkPropertyName}: "${this.linkValue}"`;
+            }
           }
           content = `---
 ${templateFrontmatter}
@@ -457,21 +582,21 @@ ${templateFrontmatter}
 ${templateBody}`;
         } else {
           content = `---
-${columnPropertyYaml}
+${frontmatterProps}
 ---
 
 ${templateContent}`;
         }
       } else {
         content = `---
-${columnPropertyYaml}
+${frontmatterProps}
 ---
 
 ${templateContent}`;
       }
     } else {
       content = `---
-${columnPropertyYaml}
+${frontmatterProps}
 ---
 
 `;
@@ -486,7 +611,7 @@ ${columnPropertyYaml}
   }
 };
 var SubtaskModal = class extends import_obsidian.Modal {
-  constructor(app, parentBasename, parentPath, defaultTemplate, defaultTitle, plugin) {
+  constructor(app, parentBasename, parentPath, defaultTemplate, defaultTitle, linkPropertyName, plugin) {
     super(app);
     this.subtaskTitle = "";
     this.selectedTemplate = null;
@@ -495,12 +620,15 @@ var SubtaskModal = class extends import_obsidian.Modal {
     this.defaultTemplatePath = defaultTemplate;
     this.defaultTitle = defaultTitle;
     this.subtaskTitle = defaultTitle;
+    this.linkPropertyName = linkPropertyName;
     this.plugin = plugin;
   }
   onOpen() {
     const { contentEl } = this;
     contentEl.addClass("bases-kanban-subtask-modal");
-    contentEl.createEl("h3", { text: `Add subtask to "${this.parentBasename}"` });
+    contentEl.createEl("h3", {
+      text: `Add subnote to "${this.parentBasename}"`
+    });
     if (this.defaultTemplatePath) {
       const templates = this.getTemplates();
       const matchingTemplate = templates.find(
@@ -510,8 +638,8 @@ var SubtaskModal = class extends import_obsidian.Modal {
         this.selectedTemplate = matchingTemplate;
       }
     }
-    new import_obsidian.Setting(contentEl).setName("Subtask title").setDesc("Name for the new subtask").addText((text) => {
-      text.setPlaceholder("Enter subtask title...");
+    new import_obsidian.Setting(contentEl).setName("Subnote title").setDesc("Name for the new subnote").addText((text) => {
+      text.setPlaceholder("Enter subnote title...");
       text.setValue(this.defaultTitle);
       text.onChange((value) => {
         this.subtaskTitle = value;
@@ -525,7 +653,7 @@ var SubtaskModal = class extends import_obsidian.Modal {
       });
     });
     new import_obsidian.Setting(contentEl).addButton((btn) => {
-      btn.setButtonText("Create subtask").setCta().onClick(() => this.createSubtask());
+      btn.setButtonText("Create subnote").setCta().onClick(() => this.createSubtask());
     });
   }
   onClose() {
@@ -550,8 +678,8 @@ var SubtaskModal = class extends import_obsidian.Modal {
       return;
     }
     const fileName = `${this.subtaskTitle.trim()}.md`;
-    const parentLink = `"[[${this.parentBasename}]]"`;
-    const parentPropertyYaml = `parent: ${parentLink}`;
+    const linkValue = `"[[${this.parentBasename}]]"`;
+    const linkPropertyYaml = this.linkPropertyName ? `${this.linkPropertyName}: ${linkValue}` : "";
     let content;
     if (this.selectedTemplate) {
       const templateContent = await this.app.vault.read(this.selectedTemplate);
@@ -560,36 +688,38 @@ var SubtaskModal = class extends import_obsidian.Modal {
         if (endOfFrontmatter !== -1) {
           let templateFrontmatter = templateContent.slice(4, endOfFrontmatter).trim();
           const templateBody = templateContent.slice(endOfFrontmatter + 3);
-          const parentRegex = /^parent:.*$/m;
-          if (parentRegex.test(templateFrontmatter)) {
-            templateFrontmatter = templateFrontmatter.replace(
-              parentRegex,
-              parentPropertyYaml
-            );
-          } else {
-            templateFrontmatter = parentPropertyYaml + "\n" + templateFrontmatter;
+          if (this.linkPropertyName) {
+            const linkPropRegex = new RegExp(`^${this.linkPropertyName}:.*$`, "m");
+            if (linkPropRegex.test(templateFrontmatter)) {
+              templateFrontmatter = templateFrontmatter.replace(
+                linkPropRegex,
+                linkPropertyYaml
+              );
+            } else {
+              templateFrontmatter = linkPropertyYaml + "\n" + templateFrontmatter;
+            }
           }
           content = `---
 ${templateFrontmatter}
 ---${templateBody}`;
         } else {
+          const fm = linkPropertyYaml ? linkPropertyYaml + "\n" : "";
           content = `---
-${parentPropertyYaml}
----
+${fm}---
 
 ${templateContent}`;
         }
       } else {
+        const fm = linkPropertyYaml ? linkPropertyYaml + "\n" : "";
         content = `---
-${parentPropertyYaml}
----
+${fm}---
 
 ${templateContent}`;
       }
     } else {
+      const fm = linkPropertyYaml ? linkPropertyYaml + "\n" : "";
       content = `---
-${parentPropertyYaml}
-status:
+${fm}status:
   - backlog
 ---
 

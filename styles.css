@@ -11,6 +11,16 @@
   align-items: flex-start;
 }
 
+/* Drag and drop states */
+.bases-kanban-card.is-dragging {
+  opacity: 0.5;
+}
+
+.bases-kanban-column-cards.drag-over {
+  background: var(--background-modifier-hover);
+  border-radius: var(--radius-s);
+}
+
 /* Column styling - minimal like Cards view */
 .bases-kanban-column {
   flex: 0 0 auto;

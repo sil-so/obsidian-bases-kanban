@@ -7,79 +7,12 @@ import {
   Setting,
   FuzzyMatch,
   FuzzySuggestModal,
-  setIcon
+  setIcon,
+  BasesView,
+  QueryController,
+  BasesEntry,
+  ViewOption
 } from "obsidian";
-
-// Type declarations for Bases API (not yet in official typings)
-declare module "obsidian" {
-  interface Plugin {
-    registerBasesView(
-      type: string,
-      config: {
-        name: string;
-        icon: string;
-        options?: () => ViewOption[];
-        factory: (
-          controller: QueryController,
-          containerEl: HTMLElement
-        ) => BasesView;
-      }
-    ): void;
-  }
-
-  interface ViewOption {
-    displayName: string;
-    key: string;
-    default: string | number | boolean;
-    type: "text" | "toggle" | "slider" | "dropdown";
-    sliderConfig?: { min: number; max: number; step: number };
-    dropdownOptions?: { value: string; display: string }[];
-    options?: string[];
-  }
-
-  interface QueryController {
-    app: App;
-  }
-
-  interface ViewConfig {
-    get(key: string): unknown;
-    getOrder(): string[];
-  }
-
-  interface GroupedData {
-    key: unknown;
-    entries: Value[];
-  }
-
-  interface ViewData {
-    groupedData: GroupedData[];
-    ungroupedData: Value[];
-  }
-
-  interface Value {
-    isEmpty(): boolean;
-    toString(): string;
-    getValue(key: string): Value;
-    file: {
-      name: string;
-      basename: string;
-      path: string;
-      extension: string;
-    };
-  }
-
-  abstract class BasesView {
-    readonly type: string;
-    readonly app: App;
-    readonly config: ViewConfig;
-    readonly data: ViewData;
-    constructor(controller: QueryController);
-    abstract onDataUpdated(): void;
-  }
-}
-
-// Re-import after declaration
-import { BasesView, QueryController, Value, ViewOption } from "obsidian";
 
 export const KANBAN_VIEW_TYPE = "kanban";
 
@@ -102,100 +35,148 @@ export default class BasesKanbanViewPlugin extends Plugin {
   private getViewOptions(): ViewOption[] {
     return [
       {
-        displayName: "Column property",
-        key: "columnProperty",
-        default: "status",
-        type: "text"
+        type: 'group',
+        displayName: 'Columns',
+        items: [
+          {
+            displayName: "Column property",
+            key: "columnProperty",
+            default: "status",
+            type: "text",
+            placeholder: "Property to group cards by"
+          },
+          {
+            displayName: "Columns (comma-separated)",
+            key: "columns",
+            default: "",
+            type: "text",
+            placeholder: "Leave empty for auto-detect"
+          },
+          {
+            displayName: "Show empty columns",
+            key: "showEmptyColumns",
+            default: true,
+            type: "toggle"
+          }
+        ]
       },
       {
-        displayName: "Columns (comma-separated, leave empty for auto)",
-        key: "columns",
-        default: "",
-        type: "text"
+        type: 'group',
+        displayName: 'Cards',
+        items: [
+          {
+            displayName: "Strip from title start",
+            key: "stripPrefix",
+            default: "",
+            type: "text"
+          },
+          {
+            displayName: "Strip from title end",
+            key: "stripSuffix",
+            default: "",
+            type: "text"
+          }
+        ]
       },
       {
-        displayName: "Strip from card title start",
-        key: "stripPrefix",
-        default: "",
-        type: "text"
+        type: 'group',
+        displayName: 'Templates',
+        items: [
+          {
+            displayName: "Default new note title",
+            key: "defaultNoteTitle",
+            default: "",
+            type: "text"
+          },
+          {
+            displayName: "Default new note template",
+            key: "defaultTemplate",
+            default: "",
+            type: "dropdown",
+            options: this.getTemplateOptionsRecord()
+          },
+          {
+            displayName: "Default subnote title",
+            key: "defaultSubtaskTitle",
+            default: "",
+            type: "text"
+          },
+          {
+            displayName: "Subnote template",
+            key: "subtaskTemplate",
+            default: "",
+            type: "dropdown",
+            options: this.getTemplateOptionsRecord()
+          }
+        ]
       },
       {
-        displayName: "Strip from card title end",
-        key: "stripSuffix",
-        default: "",
-        type: "text"
-      },
-      {
-        displayName: "Default new note title",
-        key: "defaultNoteTitle",
-        default: "",
-        type: "text"
-      },
-      {
-        displayName: "Default new note template",
-        key: "defaultTemplate",
-        default: "",
-        type: "dropdown",
-        options: this.getTemplateOptions()
-      },
-      {
-        displayName: "Card width (px)",
-        key: "cardWidth",
-        default: 250,
-        type: "slider",
-        sliderConfig: { min: 150, max: 400, step: 10 }
-      },
-      {
-        displayName: "Show empty columns",
-        key: "showEmptyColumns",
-        default: true,
-        type: "toggle"
-      },
-      {
-        displayName: "Quick add cards",
-        key: "quickAdd",
-        default: true,
-        type: "toggle"
-      },
-      {
-        displayName: "Show subtask button on cards",
-        key: "showSubtaskButton",
-        default: true,
-        type: "toggle"
-      },
-      {
-        displayName: "Subtask template",
-        key: "subtaskTemplate",
-        default: "",
-        type: "dropdown",
-        options: this.getTemplateOptions()
-      },
-      {
-        displayName: "Default new subtask title",
-        key: "defaultSubtaskTitle",
-        default: "",
-        type: "text"
+        type: 'group',
+        displayName: 'Behavior',
+        items: [
+          {
+            displayName: "Quick add cards",
+            key: "quickAdd",
+            default: true,
+            type: "toggle"
+          },
+          {
+            displayName: "Enable drag and drop",
+            key: "enableDragDrop",
+            default: true,
+            type: "toggle"
+          },
+          {
+            displayName: "Show subnote button",
+            key: "showSubtaskButton",
+            default: true,
+            type: "toggle"
+          },
+          {
+            displayName: "Link property name",
+            key: "linkPropertyName",
+            default: "",
+            type: "text",
+            placeholder: "Property to auto-set when creating notes. Empty = disabled."
+          }
+        ]
       }
     ];
   }
 
-  public getTemplateOptions(): string[] {
-    const options: string[] = [""];
-    const templateNames: string[] = [];
+  private getTemplateOptionsRecord(): Record<string, string> {
+    const options: Record<string, string> = { '': '(None)' };
 
     const templateFolder = this.app.vault.getAbstractFileByPath("templates");
     if (templateFolder instanceof TFolder) {
+      const templateNames: string[] = [];
       for (const child of templateFolder.children) {
         if (child instanceof TFile && child.extension === "md") {
           templateNames.push(child.basename);
         }
       }
+      templateNames.sort();
+      for (const name of templateNames) {
+        options[name] = name;
+      }
     }
 
-    // Sort alphabetically for consistent ordering
-    templateNames.sort();
-    options.push(...templateNames);
+    return options;
+  }
 
+  public getTemplateOptions(): string[] {
+    const options: string[] = [""];
+    const templateFolder = this.app.vault.getAbstractFileByPath("templates");
+    if (templateFolder instanceof TFolder) {
+      const templateNames: string[] = [];
+      for (const child of templateFolder.children) {
+        if (child instanceof TFile && child.extension === "md") {
+          templateNames.push(child.basename);
+        }
+      }
+      templateNames.sort();
+      options.push(...templateNames);
+    }
     return options;
   }
 }
@@ -225,19 +206,21 @@ class KanbanView extends BasesView {
         ? String(rawColumnProp)
         : "status";
     const columnsConfig = String(this.config.get("columns") || "").trim();
-    const cardWidth = Number(this.config.get("cardWidth")) || 250;
     const showEmptyColumns = this.config.get("showEmptyColumns") !== false;
     const showQuickAdd = this.config.get("quickAdd") !== false;
     const showSubtaskButton = this.config.get("showSubtaskButton") !== false;
+    const enableDragDrop = this.config.get("enableDragDrop") !== false;
     const stripPrefix = String(this.config.get("stripPrefix") || "");
     const stripSuffix = String(this.config.get("stripSuffix") || "");
+    const linkPropertyName = String(this.config.get("linkPropertyName") || "");
     const order = this.config.getOrder();
 
-    // Set card width CSS variable
-    this.containerEl.style.setProperty("--kanban-card-width", `${cardWidth}px`);
+    // Auto-detect parent from embedding file (only used if linkPropertyName is set)
+    const embeddingFile = this.getEmbeddingFile();
+    const linkValue = embeddingFile ? `[[${embeddingFile.basename}]]` : "";
 
     // Collect all items from the data
-    const allItems: Value[] = [];
+    const allItems: BasesEntry[] = [];
 
     // Try groupedData first (this is how Bases provides data to views)
     if (this.data?.groupedData && Array.isArray(this.data.groupedData)) {
@@ -248,13 +231,13 @@ class KanbanView extends BasesView {
       }
     }
 
-    // Fallback to ungroupedData if available and groupedData was empty
+    // Fallback to data if available and groupedData was empty
     if (
       allItems.length === 0 &&
-      this.data?.ungroupedData &&
-      Array.isArray(this.data.ungroupedData)
+      this.data?.data &&
+      Array.isArray(this.data.data)
     ) {
-      allItems.push(...this.data.ungroupedData);
+      allItems.push(...this.data.data);
     }
 
     if (allItems.length === 0) {
@@ -266,7 +249,7 @@ class KanbanView extends BasesView {
     }
 
     // Group data by column property
-    const columnMap = new Map<string, Value[]>();
+    const columnMap = new Map<string, BasesEntry[]>();
 
     for (const item of allItems) {
       let columnKey = "Uncategorized";
@@ -317,29 +300,82 @@ class KanbanView extends BasesView {
       }
 
       this.renderColumn(
+        this.containerEl,
         columnName,
         items,
         order,
         columnProperty,
         showQuickAdd,
         showSubtaskButton,
+        enableDragDrop,
         stripPrefix,
-        stripSuffix
+        stripSuffix,
+        linkPropertyName,
+        linkValue
       );
     }
   }
 
+  /**
+   * Auto-detect the file that embeds this base view.
+   * When a .base file is embedded in a markdown note (e.g., ![[tasks.base]]),
+   * this method finds that parent note so we can use it as the parent property.
+   */
+  private getEmbeddingFile(): TFile | null {
+    try {
+      // Find the workspace leaf that contains this view
+      const leaf = this.containerEl.closest(".workspace-leaf");
+      if (!leaf) return null;
+
+      // Try to find the view header title which shows the current file
+      const viewHeader = leaf.querySelector(".view-header-title");
+      if (viewHeader && viewHeader.textContent) {
+        // The header shows the file name
+        const files = this.app.vault.getMarkdownFiles();
+        const matchingFile = files.find(
+          (f) => f.basename === viewHeader.textContent
+        );
+        if (matchingFile) return matchingFile;
+      }
+
+      // Alternative: look for embedded content indicator
+      // When embedded, the container is inside a markdown-embed
+      const embedContainer = this.containerEl.closest(".markdown-embed");
+      if (embedContainer) {
+        // Find the parent markdown-reading-view or markdown-source-view
+        const markdownView = embedContainer.closest(
+          ".markdown-reading-view, .markdown-source-view"
+        );
+        if (markdownView) {
+          // Get the file from the active leaf or view
+          const activeFile = this.app.workspace.getActiveFile();
+          if (activeFile && activeFile.extension === "md") {
+            return activeFile;
+          }
+        }
+      }
+
+      return null;
+    } catch {
+      return null;
+    }
+  }
+
   private renderColumn(
+    container: HTMLElement,
     columnName: string,
-    items: Value[],
+    items: BasesEntry[],
     order: string[],
     columnProperty: string,
     showQuickAdd: boolean,
     showSubtaskButton: boolean,
+    enableDragDrop: boolean,
     stripPrefix: string,
-    stripSuffix: string
+    stripSuffix: string,
+    linkPropertyName: string,
+    linkValue: string
   ): void {
-    const columnEl = this.containerEl.createDiv("bases-kanban-column");
+    const columnEl = container.createDiv("bases-kanban-column");
     columnEl.dataset.column = columnName;
 
     // Column header
@@ -356,33 +392,8 @@ class KanbanView extends BasesView {
         const defaultTitle = String(this.config.get("defaultNoteTitle") || "");
         const defaultTemplateValue = this.config.get("defaultTemplate");
 
-        console.log(
-          "Raw defaultTemplateValue:",
-          defaultTemplateValue,
-          "type:",
-          typeof defaultTemplateValue
-        );
-
-        // Bases stores the index (possibly as string), so we need to look up the template name
-        let defaultTemplate = "";
-        const indexValue =
-          typeof defaultTemplateValue === "string"
-            ? parseInt(defaultTemplateValue, 10)
-            : defaultTemplateValue;
-
-        if (
-          typeof indexValue === "number" &&
-          !isNaN(indexValue) &&
-          indexValue > 0
-        ) {
-          const options = this.plugin.getTemplateOptions();
-          console.log("Options:", options, "index:", indexValue);
-          if (indexValue < options.length) {
-            defaultTemplate = options[indexValue];
-          }
-        }
-
-        console.log("Resolved template name:", defaultTemplate);
+        // Dropdown stores the template basename directly
+        const defaultTemplate = typeof defaultTemplateValue === "string" ? defaultTemplateValue : "";
 
         new QuickAddModal(
           this.app,
@@ -390,6 +401,8 @@ class KanbanView extends BasesView {
           columnName,
           defaultTitle,
           defaultTemplate,
+          linkPropertyName,
+          linkValue,
           this.plugin
         ).open();
       });
@@ -397,6 +410,42 @@ class KanbanView extends BasesView {
 
     // Cards container
     const cardsEl = columnEl.createDiv("bases-kanban-column-cards");
+
+    // Set up drag-drop on column for receiving cards
+    if (enableDragDrop) {
+      cardsEl.addEventListener("dragover", (e) => {
+        e.preventDefault();
+        cardsEl.addClass("drag-over");
+      });
+
+      cardsEl.addEventListener("dragleave", (e) => {
+        // Only remove if leaving the container entirely
+        if (!cardsEl.contains(e.relatedTarget as Node)) {
+          cardsEl.removeClass("drag-over");
+        }
+      });
+
+      cardsEl.addEventListener("drop", async (e) => {
+        e.preventDefault();
+        cardsEl.removeClass("drag-over");
+
+        const filePath = e.dataTransfer?.getData("text/plain");
+        if (!filePath) return;
+
+        const file = this.app.vault.getAbstractFileByPath(filePath);
+        if (!(file instanceof TFile)) return;
+
+        // Update the column property in frontmatter
+        try {
+          await this.app.fileManager.processFrontMatter(file, (frontmatter) => {
+            // Set as array format like the QuickAdd does
+            frontmatter[columnProperty] = [columnName];
+          });
+        } catch (err) {
+          console.error("Failed to update card column:", err);
+        }
+      });
+    }
 
     if (items.length === 0) {
       cardsEl.createDiv({
@@ -414,27 +463,43 @@ class KanbanView extends BasesView {
         order,
         columnProperty,
         showSubtaskButton,
+        enableDragDrop,
         stripPrefix,
-        stripSuffix
+        stripSuffix,
+        linkPropertyName
       );
     }
   }
 
   private renderCard(
     container: HTMLElement,
-    item: Value,
+    item: BasesEntry,
     order: string[],
     columnProperty: string,
     showSubtaskButton: boolean,
+    enableDragDrop: boolean,
     stripPrefix: string,
-    stripSuffix: string
+    stripSuffix: string,
+    linkPropertyName: string
   ): void {
     const cardEl = container.createDiv("bases-kanban-card");
     cardEl.dataset.path = item.file.path;
 
+    // Enable drag and drop
+    if (enableDragDrop) {
+      cardEl.draggable = true;
+      cardEl.addEventListener("dragstart", (e) => {
+        e.dataTransfer?.setData("text/plain", item.file.path);
+        cardEl.addClass("is-dragging");
+      });
+      cardEl.addEventListener("dragend", () => {
+        cardEl.removeClass("is-dragging");
+      });
+    }
+
     // Make entire card clickable
     cardEl.addEventListener("click", (e) => {
-      // Don't navigate if clicking on a link inside
+      // Don't navigate if clicking on a link inside or dragging
       if ((e.target as HTMLElement).closest("a")) return;
       const file = this.app.vault.getAbstractFileByPath(item.file.path);
       if (file instanceof TFile) {
@@ -466,33 +531,20 @@ class KanbanView extends BasesView {
     if (showSubtaskButton) {
       const subtaskBtn = headerEl.createEl("button", {
         cls: "bases-kanban-subtask-btn clickable-icon",
-        attr: { "aria-label": "Add subtask" }
+        attr: { "aria-label": "Add subnote" }
       });
       setIcon(subtaskBtn, "plus");
       subtaskBtn.addEventListener("click", (e) => {
         e.stopPropagation(); // Don't open the note
 
-        // Resolve subtask template
+        // Resolve subtask template - dropdown stores the basename directly
         const subtaskTemplateValue = this.config.get("subtaskTemplate");
-        let subtaskTemplate = "";
-        const indexValue =
-          typeof subtaskTemplateValue === "string"
-            ? parseInt(subtaskTemplateValue, 10)
-            : subtaskTemplateValue;
-
-        if (
-          typeof indexValue === "number" &&
-          !isNaN(indexValue) &&
-          indexValue > 0
-        ) {
-          const options = this.plugin.getTemplateOptions();
-          if (indexValue < options.length) {
-            subtaskTemplate = options[indexValue];
-          }
-        }
+        const subtaskTemplate = typeof subtaskTemplateValue === "string" ? subtaskTemplateValue : "";
 
         // Get default subtask title
-        const defaultSubtaskTitle = String(this.config.get("defaultSubtaskTitle") || "");
+        const defaultSubtaskTitle = String(
+          this.config.get("defaultSubtaskTitle") || ""
+        );
 
         new SubtaskModal(
           this.app,
@@ -500,6 +552,7 @@ class KanbanView extends BasesView {
           item.file.path,
           subtaskTemplate,
           defaultSubtaskTitle,
+          linkPropertyName,
           this.plugin
         ).open();
       });
@@ -586,6 +639,8 @@ class QuickAddModal extends Modal {
   private selectedTemplate: TFile | null = null;
   private defaultTitle: string;
   private defaultTemplatePath: string;
+  private linkPropertyName: string;
+  private linkValue: string;
 
   constructor(
     app: App,
@@ -593,6 +648,8 @@ class QuickAddModal extends Modal {
     columnValue: string,
     defaultTitle: string,
     defaultTemplate: string,
+    linkPropertyName: string,
+    linkValue: string,
     plugin: BasesKanbanViewPlugin
   ) {
     super(app);
@@ -601,6 +658,8 @@ class QuickAddModal extends Modal {
     this.defaultTitle = defaultTitle;
     this.noteTitle = defaultTitle;
     this.defaultTemplatePath = defaultTemplate;
+    this.linkPropertyName = linkPropertyName;
+    this.linkValue = linkValue;
     this.plugin = plugin;
   }
 
@@ -611,22 +670,15 @@ class QuickAddModal extends Modal {
     contentEl.createEl("h3", { text: "Add new card" });
 
     // Set template from config (if configured)
-    console.log("defaultTemplatePath:", this.defaultTemplatePath);
     if (this.defaultTemplatePath) {
       const templates = this.getTemplates();
-      console.log(
-        "Available templates:",
-        templates.map((t) => t.basename)
-      );
       const matchingTemplate = templates.find(
         (t) => t.basename === this.defaultTemplatePath
       );
-      console.log("Matching template:", matchingTemplate);
       if (matchingTemplate) {
         this.selectedTemplate = matchingTemplate;
       }
     }
-    console.log("Selected template:", this.selectedTemplate);
 
     // Note title input
     new Setting(contentEl)
@@ -681,7 +733,12 @@ class QuickAddModal extends Modal {
     const fileName = `${this.noteTitle.trim()}.md`;
 
     // Build frontmatter with list format for column property
-    const columnPropertyYaml = `${this.columnProperty}:\n  - ${this.columnValue}`;
+    let frontmatterProps = `${this.columnProperty}:\n  - ${this.columnValue}`;
+
+    // Add link property if configured (quote to prevent YAML [[]] list interpretation)
+    if (this.linkPropertyName && this.linkValue) {
+      frontmatterProps += `\n${this.linkPropertyName}: "${this.linkValue}"`;
+    }
 
     let content: string;
 
@@ -708,26 +765,41 @@ class QuickAddModal extends Modal {
             // Replace existing column property with new value
             templateFrontmatter = templateFrontmatter.replace(
               propRegex,
-              columnPropertyYaml
+              `${this.columnProperty}:\n  - ${this.columnValue}`
             );
           } else {
             // Add column property at the beginning
             templateFrontmatter =
-              columnPropertyYaml + "\n" + templateFrontmatter;
+              `${this.columnProperty}:\n  - ${this.columnValue}` +
+              "\n" +
+              templateFrontmatter;
+          }
+
+          // Handle link property if configured
+          if (this.linkPropertyName && this.linkValue) {
+            const linkPropRegex = new RegExp(`^${this.linkPropertyName}:.*$`, "m");
+            if (linkPropRegex.test(templateFrontmatter)) {
+              templateFrontmatter = templateFrontmatter.replace(
+                linkPropRegex,
+                `${this.linkPropertyName}: "${this.linkValue}"`
+              );
+            } else {
+              templateFrontmatter += `\n${this.linkPropertyName}: "${this.linkValue}"`;
+            }
           }
 
           content = `---\n${templateFrontmatter}\n---\n${templateBody}`;
         } else {
           // Malformed frontmatter, just prepend
-          content = `---\n${columnPropertyYaml}\n---\n\n${templateContent}`;
+          content = `---\n${frontmatterProps}\n---\n\n${templateContent}`;
         }
       } else {
         // No frontmatter in template
-        content = `---\n${columnPropertyYaml}\n---\n\n${templateContent}`;
+        content = `---\n${frontmatterProps}\n---\n\n${templateContent}`;
       }
     } else {
       // No template selected
-      content = `---\n${columnPropertyYaml}\n---\n\n`;
+      content = `---\n${frontmatterProps}\n---\n\n`;
     }
 
     try {
@@ -748,6 +820,7 @@ class SubtaskModal extends Modal {
   private selectedTemplate: TFile | null = null;
   private defaultTemplatePath: string;
   private defaultTitle: string;
+  private linkPropertyName: string;
 
   constructor(
     app: App,
@@ -755,6 +828,7 @@ class SubtaskModal extends Modal {
     parentPath: string,
     defaultTemplate: string,
     defaultTitle: string,
+    linkPropertyName: string,
     plugin: BasesKanbanViewPlugin
   ) {
     super(app);
@@ -763,6 +837,7 @@ class SubtaskModal extends Modal {
     this.defaultTemplatePath = defaultTemplate;
     this.defaultTitle = defaultTitle;
     this.subtaskTitle = defaultTitle;
+    this.linkPropertyName = linkPropertyName;
     this.plugin = plugin;
   }
 
@@ -770,7 +845,9 @@ class SubtaskModal extends Modal {
     const { contentEl } = this;
     contentEl.addClass("bases-kanban-subtask-modal");
 
-    contentEl.createEl("h3", { text: `Add subtask to "${this.parentBasename}"` });
+    contentEl.createEl("h3", {
+      text: `Add subnote to "${this.parentBasename}"`
+    });
 
     // Set template from config (if configured)
     if (this.defaultTemplatePath) {
@@ -783,19 +860,18 @@ class SubtaskModal extends Modal {
       }
     }
 
-    // Subtask title input
     new Setting(contentEl)
-      .setName("Subtask title")
-      .setDesc("Name for the new subtask")
+      .setName("Subnote title")
+      .setDesc("Name for the new subnote")
       .addText((text) => {
-        text.setPlaceholder("Enter subtask title...");
+        text.setPlaceholder("Enter subnote title...");
         text.setValue(this.defaultTitle);
         text.onChange((value) => {
           this.subtaskTitle = value;
         });
         // Focus the input
         setTimeout(() => text.inputEl.focus(), 50);
-        
+
         // Submit on Enter
         text.inputEl.addEventListener("keydown", (e) => {
           if (e.key === "Enter") {
@@ -805,10 +881,9 @@ class SubtaskModal extends Modal {
         });
       });
 
-    // Create button
     new Setting(contentEl).addButton((btn) => {
       btn
-        .setButtonText("Create subtask")
+        .setButtonText("Create subnote")
         .setCta()
         .onClick(() => this.createSubtask());
     });
@@ -841,10 +916,10 @@ class SubtaskModal extends Modal {
     }
 
     const fileName = `${this.subtaskTitle.trim()}.md`;
-    
-    // Build frontmatter with parent link
-    const parentLink = `"[[${this.parentBasename}]]"`;
-    const parentPropertyYaml = `parent: ${parentLink}`;
+
+    // Build frontmatter with link property (only if configured)
+    const linkValue = `"[[${this.parentBasename}]]"`;
+    const linkPropertyYaml = this.linkPropertyName ? `${this.linkPropertyName}: ${linkValue}` : "";
 
     let content: string;
 
@@ -860,32 +935,38 @@ class SubtaskModal extends Modal {
             .trim();
           const templateBody = templateContent.slice(endOfFrontmatter + 3);
 
-          // Check if template already has parent property (with or without value)
-          const parentRegex = /^parent:.*$/m;
+          // Handle link property if configured
+          if (this.linkPropertyName) {
+            const linkPropRegex = new RegExp(`^${this.linkPropertyName}:.*$`, "m");
 
-          if (parentRegex.test(templateFrontmatter)) {
-            // Replace existing parent property with new value
-            templateFrontmatter = templateFrontmatter.replace(
-              parentRegex,
-              parentPropertyYaml
-            );
-          } else {
-            // Add parent property at the beginning
-            templateFrontmatter = parentPropertyYaml + "\n" + templateFrontmatter;
+            if (linkPropRegex.test(templateFrontmatter)) {
+              // Replace existing property with new value
+              templateFrontmatter = templateFrontmatter.replace(
+                linkPropRegex,
+                linkPropertyYaml
+              );
+            } else {
+              // Add property at the beginning
+              templateFrontmatter =
+                linkPropertyYaml + "\n" + templateFrontmatter;
+            }
           }
 
           content = `---\n${templateFrontmatter}\n---${templateBody}`;
         } else {
           // Malformed frontmatter, just prepend
-          content = `---\n${parentPropertyYaml}\n---\n\n${templateContent}`;
+          const fm = linkPropertyYaml ? linkPropertyYaml + "\n" : "";
+          content = `---\n${fm}---\n\n${templateContent}`;
         }
       } else {
         // No frontmatter in template
-        content = `---\n${parentPropertyYaml}\n---\n\n${templateContent}`;
+        const fm = linkPropertyYaml ? linkPropertyYaml + "\n" : "";
+        content = `---\n${fm}---\n\n${templateContent}`;
       }
     } else {
-      // No template selected - create minimal note with parent
-      content = `---\n${parentPropertyYaml}\nstatus:\n  - backlog\n---\n\n`;
+      // No template selected - create minimal note
+      const fm = linkPropertyYaml ? linkPropertyYaml + "\n" : "";
+      content = `---\n${fm}status:\n  - backlog\n---\n\n`;
     }
 
     try {
