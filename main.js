@@ -72,6 +72,16 @@ var BasesKanbanViewPlugin = class extends import_obsidian.Plugin {
         displayName: "Cards",
         items: [
           {
+            displayName: "Card size",
+            key: "cardSize",
+            default: 250,
+            type: "slider",
+            min: 100,
+            max: 500,
+            step: 10,
+            instant: true
+          },
+          {
             displayName: "Strip from title start",
             key: "stripPrefix",
             default: "",
@@ -203,7 +213,9 @@ var KanbanView = class extends import_obsidian.BasesView {
     const stripPrefix = String(this.config.get("stripPrefix") || "");
     const stripSuffix = String(this.config.get("stripSuffix") || "");
     const linkPropertyName = String(this.config.get("linkPropertyName") || "");
+    const cardWidth = Number(this.config.get("cardSize")) || 250;
     const order = this.config.getOrder();
+    this.containerEl.style.setProperty("--kanban-card-width", `${cardWidth}px`);
     const embeddingFile = this.getEmbeddingFile();
     const linkValue = embeddingFile ? `[[${embeddingFile.basename}]]` : "";
     const allItems = [];
