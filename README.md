@@ -88,6 +88,12 @@ A Kanban board view for [Obsidian Bases](https://obsidian.md/blog/introducing-ob
 2. Run `BRAT: Add a beta plugin for testing`
 3. Enter this repository URL
 
+## Images
+
+<img width="1514" height="951" alt="SCR-20260128-nucl" src="https://github.com/user-attachments/assets/7da8c03b-9510-4a0b-a641-ac431d9a38c7" />
+
+<img width="1514" height="951" alt="SCR-20260128-nurd" src="https://github.com/user-attachments/assets/d3e4b40d-5b52-4220-9f81-d92318761dd6" />
+
 ## License
 
 [MIT](LICENSE)
