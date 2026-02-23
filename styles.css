@@ -18,13 +18,13 @@
 
 .bases-kanban-column-cards.drag-over {
   background: var(--background-modifier-hover);
-  border-radius: var(--radius-s);
+  border-radius: var(--radius-m);
 }
 
 /* Column styling - minimal like Cards view */
 .bases-kanban-column {
   flex: 0 0 auto;
-  width: var(--kanban-card-width, 250px);
+  width: var(--kanban-card-width, 270px);
   min-width: 180px;
   max-height: 100%;
   display: flex;
@@ -56,14 +56,16 @@
   display: flex;
   flex-direction: column;
   gap: var(--size-4-2);
+  padding: 1px;
 }
 
 /* Individual card - matches Cards view styling */
 .bases-kanban-card {
   background-color: var(--bases-cards-background);
-  border-radius: var(--radius-s);
+  border-radius: var(--radius-m);
   padding: var(--size-4-2) var(--size-4-3);
   cursor: pointer;
+  box-shadow: var(--bases-cards-shadow);
 }
 
 /* Card header - contains title and subtask button */
@@ -90,7 +92,7 @@
   border: none;
   color: var(--text-faint);
   cursor: pointer;
-  padding: 2px;
+  padding: 4px !important;
   border-radius: var(--radius-s);
   flex-shrink: 0;
   opacity: 0;
@@ -129,7 +131,7 @@
 
 /* Property label - customize as needed */
 .kanban-property-label {
-  color: var(--bases-cards-label-color);
+  color: var(--text-faint);
   font-weight: var(--font-semi-medium);
   padding-block-end: 2px;
   letter-spacing: 0.00625em;

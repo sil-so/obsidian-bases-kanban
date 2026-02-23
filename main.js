@@ -74,7 +74,7 @@ var BasesKanbanViewPlugin = class extends import_obsidian.Plugin {
           {
             displayName: "Card size",
             key: "cardSize",
-            default: 250,
+            default: 270,
             type: "slider",
             min: 100,
             max: 500,
@@ -213,7 +213,7 @@ var KanbanView = class extends import_obsidian.BasesView {
     const stripPrefix = String(this.config.get("stripPrefix") || "");
     const stripSuffix = String(this.config.get("stripSuffix") || "");
     const linkPropertyName = String(this.config.get("linkPropertyName") || "");
-    const cardWidth = Number(this.config.get("cardSize")) || 250;
+    const cardWidth = Number(this.config.get("cardSize")) || 270;
     const order = this.config.getOrder();
     this.containerEl.style.setProperty("--kanban-card-width", `${cardWidth}px`);
     const embeddingFile = this.getEmbeddingFile();
@@ -229,7 +229,7 @@ var KanbanView = class extends import_obsidian.BasesView {
     if (allItems.length === 0 && ((_b = this.data) == null ? void 0 : _b.data) && Array.isArray(this.data.data)) {
       allItems.push(...this.data.data);
     }
-    if (allItems.length === 0) {
+    if (allItems.length === 0 && !(columnsConfig && showEmptyColumns)) {
       this.containerEl.createDiv({
         cls: "bases-kanban-no-data",
         text: "No items to display."
@@ -278,7 +278,8 @@ var KanbanView = class extends import_obsidian.BasesView {
         stripPrefix,
         stripSuffix,
         linkPropertyName,
-        linkValue
+        linkValue,
+        embeddingFile
       );
     }
   }
@@ -316,7 +317,7 @@ var KanbanView = class extends import_obsidian.BasesView {
       return null;
     }
   }
-  renderColumn(container, columnName, items, order, columnProperty, showQuickAdd, showSubtaskButton, enableDragDrop, stripPrefix, stripSuffix, linkPropertyName, linkValue) {
+  renderColumn(container, columnName, items, order, columnProperty, showQuickAdd, showSubtaskButton, enableDragDrop, stripPrefix, stripSuffix, linkPropertyName, linkValue, embeddingFile = null) {
     const columnEl = container.createDiv("bases-kanban-column");
     columnEl.dataset.column = columnName;
     const headerEl = columnEl.createDiv("bases-kanban-column-header");
@@ -328,8 +329,14 @@ var KanbanView = class extends import_obsidian.BasesView {
       });
       (0, import_obsidian.setIcon)(addBtn, "plus");
       addBtn.addEventListener("click", () => {
-        const defaultTitle = String(this.config.get("defaultNoteTitle") || "");
-        const defaultTemplateValue = this.config.get("defaultTemplate");
+        let defaultTitle = String(this.config.get("defaultNoteTitle") || "");
+        let defaultTemplateValue = this.config.get("defaultTemplate");
+        if (embeddingFile && embeddingFile.basename.toLowerCase().startsWith("task ")) {
+          const subTitle = this.config.get("defaultSubtaskTitle");
+          if (subTitle) defaultTitle = String(subTitle);
+          const subTemplate = this.config.get("subtaskTemplate");
+          if (subTemplate) defaultTemplateValue = subTemplate;
+        }
         const defaultTemplate = typeof defaultTemplateValue === "string" ? defaultTemplateValue : "";
         new QuickAddModal(
           this.app,
@@ -577,7 +584,10 @@ ${this.linkPropertyName}: "${this.linkValue}"`;
 ` + templateFrontmatter;
           }
           if (this.linkPropertyName && this.linkValue) {
-            const linkPropRegex = new RegExp(`^${this.linkPropertyName}:.*$`, "m");
+            const linkPropRegex = new RegExp(
+              `^${this.linkPropertyName}:.*$`,
+              "m"
+            );
             if (linkPropRegex.test(templateFrontmatter)) {
               templateFrontmatter = templateFrontmatter.replace(
                 linkPropRegex,
@@ -701,7 +711,10 @@ var SubtaskModal = class extends import_obsidian.Modal {
           let templateFrontmatter = templateContent.slice(4, endOfFrontmatter).trim();
           const templateBody = templateContent.slice(endOfFrontmatter + 3);
           if (this.linkPropertyName) {
-            const linkPropRegex = new RegExp(`^${this.linkPropertyName}:.*$`, "m");
+            const linkPropRegex = new RegExp(
+              `^${this.linkPropertyName}:.*$`,
+              "m"
+            );
             if (linkPropRegex.test(templateFrontmatter)) {
               templateFrontmatter = templateFrontmatter.replace(
                 linkPropRegex,

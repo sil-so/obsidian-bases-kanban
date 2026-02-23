@@ -35,8 +35,8 @@ export default class BasesKanbanViewPlugin extends Plugin {
   private getViewOptions(): ViewOption[] {
     return [
       {
-        type: 'group',
-        displayName: 'Columns',
+        type: "group",
+        displayName: "Columns",
         items: [
           {
             displayName: "Column property",
@@ -61,13 +61,13 @@ export default class BasesKanbanViewPlugin extends Plugin {
         ]
       },
       {
-        type: 'group',
-        displayName: 'Cards',
+        type: "group",
+        displayName: "Cards",
         items: [
           {
             displayName: "Card size",
             key: "cardSize",
-            default: 250,
+            default: 270,
             type: "slider",
             min: 100,
             max: 500,
@@ -89,8 +89,8 @@ export default class BasesKanbanViewPlugin extends Plugin {
         ]
       },
       {
-        type: 'group',
-        displayName: 'Templates',
+        type: "group",
+        displayName: "Templates",
         items: [
           {
             displayName: "Default new note title",
@@ -121,8 +121,8 @@ export default class BasesKanbanViewPlugin extends Plugin {
         ]
       },
       {
-        type: 'group',
-        displayName: 'Behavior',
+        type: "group",
+        displayName: "Behavior",
         items: [
           {
             displayName: "Quick add cards",
@@ -147,7 +147,8 @@ export default class BasesKanbanViewPlugin extends Plugin {
             key: "linkPropertyName",
             default: "",
             type: "text",
-            placeholder: "Property to auto-set when creating notes. Empty = disabled."
+            placeholder:
+              "Property to auto-set when creating notes. Empty = disabled."
           }
         ]
       }
@@ -155,7 +156,7 @@ export default class BasesKanbanViewPlugin extends Plugin {
   }
 
   private getTemplateOptionsRecord(): Record<string, string> {
-    const options: Record<string, string> = { '': '(None)' };
+    const options: Record<string, string> = { "": "(None)" };
 
     const templateFolder = this.app.vault.getAbstractFileByPath("templates");
     if (templateFolder instanceof TFolder) {
@@ -223,7 +224,7 @@ class KanbanView extends BasesView {
     const stripPrefix = String(this.config.get("stripPrefix") || "");
     const stripSuffix = String(this.config.get("stripSuffix") || "");
     const linkPropertyName = String(this.config.get("linkPropertyName") || "");
-    const cardWidth = Number(this.config.get("cardSize")) || 250;
+    const cardWidth = Number(this.config.get("cardSize")) || 270;
     const order = this.config.getOrder();
 
     // Apply card width as CSS custom property
@@ -254,7 +255,7 @@ class KanbanView extends BasesView {
       allItems.push(...this.data.data);
     }
 
-    if (allItems.length === 0) {
+    if (allItems.length === 0 && !(columnsConfig && showEmptyColumns)) {
       this.containerEl.createDiv({
         cls: "bases-kanban-no-data",
         text: "No items to display."
@@ -325,7 +326,8 @@ class KanbanView extends BasesView {
         stripPrefix,
         stripSuffix,
         linkPropertyName,
-        linkValue
+        linkValue,
+        embeddingFile
       );
     }
   }
@@ -387,7 +389,8 @@ class KanbanView extends BasesView {
     stripPrefix: string,
     stripSuffix: string,
     linkPropertyName: string,
-    linkValue: string
+    linkValue: string,
+    embeddingFile: TFile | null = null
   ): void {
     const columnEl = container.createDiv("bases-kanban-column");
     columnEl.dataset.column = columnName;
@@ -403,11 +406,21 @@ class KanbanView extends BasesView {
       });
       setIcon(addBtn, "plus");
       addBtn.addEventListener("click", () => {
-        const defaultTitle = String(this.config.get("defaultNoteTitle") || "");
-        const defaultTemplateValue = this.config.get("defaultTemplate");
+        let defaultTitle = String(this.config.get("defaultNoteTitle") || "");
+        let defaultTemplateValue = this.config.get("defaultTemplate");
+
+        // If embedded in a task note, intelligently fallback to subtask properties
+        if (embeddingFile && embeddingFile.basename.toLowerCase().startsWith("task ")) {
+          const subTitle = this.config.get("defaultSubtaskTitle");
+          if (subTitle) defaultTitle = String(subTitle);
+          
+          const subTemplate = this.config.get("subtaskTemplate");
+          if (subTemplate) defaultTemplateValue = subTemplate;
+        }
 
         // Dropdown stores the template basename directly
-        const defaultTemplate = typeof defaultTemplateValue === "string" ? defaultTemplateValue : "";
+        const defaultTemplate =
+          typeof defaultTemplateValue === "string" ? defaultTemplateValue : "";
 
         new QuickAddModal(
           this.app,
@@ -553,7 +566,8 @@ class KanbanView extends BasesView {
 
         // Resolve subtask template - dropdown stores the basename directly
         const subtaskTemplateValue = this.config.get("subtaskTemplate");
-        const subtaskTemplate = typeof subtaskTemplateValue === "string" ? subtaskTemplateValue : "";
+        const subtaskTemplate =
+          typeof subtaskTemplateValue === "string" ? subtaskTemplateValue : "";
 
         // Get default subtask title
         const defaultSubtaskTitle = String(
@@ -791,7 +805,10 @@ class QuickAddModal extends Modal {
 
           // Handle link property if configured
           if (this.linkPropertyName && this.linkValue) {
-            const linkPropRegex = new RegExp(`^${this.linkPropertyName}:.*$`, "m");
+            const linkPropRegex = new RegExp(
+              `^${this.linkPropertyName}:.*$`,
+              "m"
+            );
             if (linkPropRegex.test(templateFrontmatter)) {
               templateFrontmatter = templateFrontmatter.replace(
                 linkPropRegex,
@@ -933,7 +950,9 @@ class SubtaskModal extends Modal {
 
     // Build frontmatter with link property (only if configured)
     const linkValue = `"[[${this.parentBasename}]]"`;
-    const linkPropertyYaml = this.linkPropertyName ? `${this.linkPropertyName}: ${linkValue}` : "";
+    const linkPropertyYaml = this.linkPropertyName
+      ? `${this.linkPropertyName}: ${linkValue}`
+      : "";
 
     let content: string;
 
@@ -951,7 +970,10 @@ class SubtaskModal extends Modal {
 
           // Handle link property if configured
           if (this.linkPropertyName) {
-            const linkPropRegex = new RegExp(`^${this.linkPropertyName}:.*$`, "m");
+            const linkPropRegex = new RegExp(
+              `^${this.linkPropertyName}:.*$`,
+              "m"
+            );
 
             if (linkPropRegex.test(templateFrontmatter)) {
               // Replace existing property with new value
